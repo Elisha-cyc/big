@@ -73,3 +73,4 @@ h2{font-size:1.12rem;margin:0 0 8px}
 @keyframes beat{50%{transform:scale(1.03)}}
 @keyframes fall{to{transform:translate(var(--dx),105vh) rotate(720deg)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:30;font-weight:700;max-width:90vw;text-align:center;animation:pop .25s ease both}
