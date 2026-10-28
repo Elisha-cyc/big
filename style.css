@@ -61,7 +61,8 @@ h2{font-size:1.12rem;margin:0 0 8px}
 .in{display:flex;gap:8px;align-items:center}
 .in input,select{min-width:0;padding:12px;border:2px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font:1rem var(--ui)}
 .in input{flex:1}
-#mic{width:100%;font-size:1.1rem;padding:16px}
+#mic{flex:1;font-size:1.1rem;padding:16px}
+#rp{padding:16px 14px;white-space:nowrap}
 #mic.live{background:var(--peach);animation:beat 1s ease-in-out infinite}
 .cf{position:fixed;top:-14px;width:10px;height:14px;border-radius:3px;z-index:20;pointer-events:none;animation:fall 2.2s ease-in forwards}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
