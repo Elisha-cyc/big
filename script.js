@@ -27,7 +27,7 @@ function say(t){if(!t)return;try{var ss=speechSynthesis;if(!zv)pickVoice();if(!z
 function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
 var V=[["path","Path","🌱"],["learn","Learn","📖"],["cards","Cards","🃏"],["quiz","Quiz","⭐"],["write","Write","✍️"],["chat","Talk","🎤"]];
 var cur="path";
-function tabs(){$("#tabs").innerHTML=V.map(function(t){return '<button role="tab" data-v="'+t[0]+'" aria-selected="'+(t[0]==cur)+'"><span class="ic">'+t[2]+'</span>'+t[1]+'</button>'}).join("");
+function tabs(){stopVoice();$("#tabs").innerHTML=V.map(function(t){return '<button role="tab" data-v="'+t[0]+'" aria-selected="'+(t[0]==cur)+'"><span class="ic">'+t[2]+'</span>'+t[1]+'</button>'}).join("");
  document.querySelectorAll("#tabs button").forEach(function(b){b.onclick=function(){stopVoice();cur=b.dataset.v;tabs();R[cur]()}})}
 function sp(t){return '<button class="sp" aria-label="Listen" data-s="'+t+'">🔊</button>'}
 function bindSay(){document.querySelectorAll("[data-s]").forEach(function(b){b.onclick=function(e){e.stopPropagation();say(b.dataset.s)}})}
@@ -100,9 +100,9 @@ R.chat=function(){
  function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;var l=$("#log");if(l){l.appendChild(d);l.scrollTop=1e9}return d}
  hist.forEach(function(m){add(m.role=="user"?"u":"a",m.content)});
  if(!hist.length)add("a","你好！Nǐ hǎo! Hello! 你好吗？Nǐ hǎo ma? How are you?");
- async function send(t){t=(t||"").trim();if(!t||busy)return;
+ async function send(t){t=undouble((t||"").trim());if(!t||busy)return;if(t==lastSent&&Date.now()-lastAt<4000)return;lastSent=t;lastAt=Date.now();busy=true;
   if(!smp){try{smp=await claude.use("sample")}catch(e){smp=null}}
-
+  
   $("#ci").value="";hist.push({role:"user",content:t});add("u",t);busy=true;var d=add("a","…");
   var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+"\n\n"+m.content:m.content}});
   try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text});if(aloud&&$("#log"))say(zhOnly(r.text))}
@@ -113,11 +113,11 @@ R.chat=function(){
   if(!SR){$("#cn").textContent="Voice input isn’t available here. Open the link in Chrome (Android) or Safari (iPhone), not inside another app, or type below.";return}
   if(live){rec.stop();return}
   try{speechSynthesis.cancel()}catch(e){}
-  var fin="";rec=new SR();rec.lang=lang;rec.interimResults=true;
+  var fin="",done=false;rec=new SR();rec.lang=lang;rec.interimResults=true;
   rec.onstart=function(){live=true;$("#mic").classList.add("live");$("#mic").textContent="⏹ Listening… tap to stop"};
-  rec.onresult=function(e){var s="";for(var i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;$("#ci").value=s;if(e.results[e.results.length-1].isFinal)fin=s};
+  rec.onresult=function(e){var last=e.results[e.results.length-1],s=undouble(last[0].transcript.trim());$("#ci").value=s;if(last.isFinal)fin=s};
   rec.onerror=function(e){$("#cn").textContent=(e.error=="not-allowed"||e.error=="service-not-allowed")?"The microphone is blocked here. Allow microphone access in your browser, or type below.":"I didn’t catch that. Tap the microphone and try again."};
-  rec.onend=function(){live=false;var m=$("#mic");if(m){m.textContent="🎤 Tap to talk";m.classList.remove("live")}if(fin)send(fin)};
+  rec.onend=function(){if(done)return;done=true;live=false;var m=$("#mic");if(m){m.textContent="🎤 Tap to talk";m.classList.remove("live")}if(fin)send(fin)};
   try{rec.start()}catch(e){live=false}}};
 var P=[
 {t:"The four tones",i:T.map(function(x){return[x[1],x[0],x[2]]}),tips:TN,w:[]},
@@ -174,6 +174,9 @@ async function ask(msgs,cb){
  var t=await q.text(),d={};try{d=JSON.parse(t)}catch(e){}
  if(!q.ok||!d.text)throw new Error(d.error||("server answered "+q.status+(q.status==404?", api/chat.js is not deployed":"")));
  return{text:d.text}}
-function stopVoice(){try{if(rec){rec.onend=null;rec.onerror=null;rec.onresult=null;rec.abort()}}catch(e){}live=false;try{speechSynthesis.cancel()}catch(e){}}
+function stopVoice(){try{if(rec){rec.onend=null;rec.onerror=null;rec.onresult=null;try{rec.stop()}catch(e){}rec.abort()}}catch(e){}live=false;try{speechSynthesis.cancel()}catch(e){}}
 document.addEventListener("visibilitychange",function(){if(document.hidden)stopVoice()});
+window.addEventListener("pagehide",stopVoice);
+var lastSent="",lastAt=0;
+function undouble(s){var m=s.match(/^(.+?)\s*\1$/);return m?m[1]:s}
 tabs();R.path();streak();bar();
