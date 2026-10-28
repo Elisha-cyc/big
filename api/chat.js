@@ -1,4 +1,10 @@
-const SYS = "You are a patient Chinese (Mandarin) tutor for a complete beginner. This is a spoken conversation, so keep replies to 3 short lines at most. Use only simple words. Always write Chinese characters, then pinyin with tone marks, then the English meaning. Gently correct mistakes. End with one easy question in Chinese (with pinyin and English) to keep the chat going.";
+const BASE = "You are a friendly, patient Mandarin Chinese tutor in a spoken conversation. Gently correct mistakes by showing the right way to say it. End with one question in Chinese to keep the chat going.";
+const LEVELS = {
+  beginner: "The student is a complete beginner. Use only very simple, common words and short sentences. Keep replies to 3 short lines at most. Always give the Chinese characters, then pinyin with tone marks, then the English meaning.",
+  intermediate: "The student is an intermediate learner who knows basic grammar and a few hundred words. Use everyday vocabulary and simple sentences, adding a few new words each time. Keep replies to 4 short lines. Write Chinese characters with pinyin, and give English only for new or difficult words and for corrections.",
+  advanced: "The student is an advanced learner. Speak natural, fluent Mandarin, using idioms and richer grammar where it fits. Write mainly in Chinese characters, add pinyin only for rare words, and use English only to explain corrections or when asked. Keep replies to 5 short lines and ask a more thoughtful question."
+};
+function sysFor(level) { return BASE + " " + LEVELS[level]; }
 
 const PREFER = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"];
 let cachedModel = null;
@@ -29,6 +35,7 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: "Set GROQ_API_KEY in Vercel" });
   }
 
+  const level = req.body && LEVELS[req.body.level] ? req.body.level : "beginner";
   let msgs = req.body && req.body.messages;
   if (!Array.isArray(msgs)) return res.status(400).json({ error: "messages must be a list" });
   msgs = msgs.slice(-12).map(m => ({
@@ -45,7 +52,7 @@ module.exports = async function handler(req, res) {
       const body = {
         model,
         temperature: 0.6,
-        messages: [{ role: "system", content: SYS }].concat(msgs)
+        messages: [{ role: "system", content: sysFor(level) }].concat(msgs)
       };
       if (/gpt-oss/i.test(model)) {
         body.reasoning_effort = "low";
@@ -68,7 +75,7 @@ module.exports = async function handler(req, res) {
       r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": claudeKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 400, system: SYS, messages: msgs })
+        body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 400, system: sysFor(level), messages: msgs })
       });
       d = await r.json();
       if (!r.ok) return res.status(502).json({ error: (d.error && d.error.message) || "API error" });
