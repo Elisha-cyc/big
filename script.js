@@ -16,13 +16,14 @@ function info(c){var w=W.filter(function(x){return x[0]==c})[0];return c+" · "+
 var $=function(s){return document.querySelector(s)};
 function ld(k,d){try{var x=localStorage.getItem(k);return x?JSON.parse(x):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+var rate=ld("rate",.7),level=ld("level","beginner");
 var zv=null,warned=false;
 function pickVoice(){try{zv=speechSynthesis.getVoices().filter(function(x){return /^zh/i.test(x.lang.replace("_","-"))})[0]||null}catch(e){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
 function toast(m){var d=document.createElement("div");d.className="toast";d.textContent=m;document.body.appendChild(d);setTimeout(function(){d.remove()},4500)}
 function unlock(){try{var u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u)}catch(e){}}
 function say(t){if(!t)return;try{var ss=speechSynthesis;if(!zv)pickVoice();if(!zv&&!warned&&ss.getVoices().length){warned=true;toast("No Chinese voice found on this phone. Add one in your phone’s text-to-speech settings.")}
- var u=new SpeechSynthesisUtterance(t);u.lang="zh-CN";if(zv)u.voice=zv;u.rate=.8;ss.resume();
+ var u=new SpeechSynthesisUtterance(t);u.lang="zh-CN";if(zv)u.voice=zv;u.rate=rate;ss.resume();
  if(ss.speaking||ss.pending){ss.cancel();setTimeout(function(){ss.speak(u)},150)}else ss.speak(u)}catch(e){}}
 function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
 var V=[["path","Path","🌱"],["learn","Learn","📖"],["cards","Cards","🃏"],["quiz","Quiz","⭐"],["write","Write","✍️"],["chat","Talk","🎤"]];
@@ -83,7 +84,7 @@ R.chatText=function(){
   if(!smp){try{smp=await claude.use("sample")}catch(e){smp=null}}
   if(!smp){add("a","The chat tutor isn’t available in this view. Open the page from your claude.ai account to use it.");return}
   $("#ci").value="";hist.push({role:"user",content:t});add("u",t);busy=true;var d=add("a","…");
-  var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+"\n\n"+m.content:m.content}});
+  var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+" The student’s level is "+level+".\n\n"+m.content:m.content}});
   try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text})}
   catch(e){d.textContent="Couldn’t reach the tutor ("+(e&&e.message||"unknown error")+"). Wait a moment and try again.";hist.pop()}
   busy=false}
@@ -93,9 +94,13 @@ function zhOnly(t){return (t.match(/[\u4e00-\u9fff，。！？、]+/g)||[]).join
 R.chat=function(){
  $("#v").innerHTML='<div class="card"><h2>Talk with your tutor</h2><p class="note" id="cn">Tap the microphone and speak. Your tutor answers out loud and in writing.</p>'+
  '<div class="in" style="margin-bottom:10px;flex-wrap:wrap"><label class="note">I will speak <select id="lg"><option value="zh-CN">Chinese</option><option value="en-US">English</option></select></label><label class="note"><input type="checkbox" id="al"> Read replies aloud</label></div>'+
- '<div id="log"></div><div style="text-align:center;margin-bottom:10px"><button class="btn" id="mic">🎤 Tap to talk</button></div>'+
+'<div class="in" style="margin-bottom:10px;flex-wrap:wrap"><label class="note">My level <select id="lv"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label><label class="note">Voice speed <select id="rt"><option value="0.5">Very slow</option><option value="0.7">Slow</option><option value="0.9">Normal</option><option value="1.1">Fast</option></select></label></div>'+
+ '<div id="log"></div><div class="in" style="margin-bottom:10px"><button class="btn" id="mic">🎤 Tap to talk</button><button class="btn alt" id="rp" aria-label="Repeat the last reply">🔁 Repeat</button></div>'+
  '<div class="in"><input id="ci" placeholder="Or type here" aria-label="Message"><button class="btn alt" id="sd">Send</button></div></div>';
- $("#lg").value=lang;$("#al").checked=aloud;
+ $("#lg").value=lang;$("#al").checked=aloud;$("#lv").value=level;$("#rt").value=String(rate);
+ $("#lv").onchange=function(){level=this.value;sv("level",level);toast("Level: "+this.options[this.selectedIndex].text)};
+ $("#rt").onchange=function(){rate=+this.value;sv("rate",rate);say("你好，你好吗？")};
+ $("#rp").onclick=function(){unlock();var a=hist.filter(function(m){return m.role=="assistant"}).pop();say(zhOnly(a?a.content:"你好！你好吗？"))};
  $("#lg").onchange=function(){lang=this.value};$("#al").onchange=function(){aloud=this.checked;if(!aloud)try{speechSynthesis.cancel()}catch(e){}};
  function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;var l=$("#log");if(l){l.appendChild(d);l.scrollTop=1e9}return d}
  hist.forEach(function(m){add(m.role=="user"?"u":"a",m.content)});
@@ -104,7 +109,7 @@ R.chat=function(){
   if(!smp){try{smp=await claude.use("sample")}catch(e){smp=null}}
   
   $("#ci").value="";hist.push({role:"user",content:t});add("u",t);busy=true;var d=add("a","…");
-  var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+"\n\n"+m.content:m.content}});
+  var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+" The student’s level is "+level+".\n\n"+m.content:m.content}});
   try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text});if(aloud&&$("#log"))say(zhOnly(r.text))}
   catch(e){d.textContent="Couldn’t reach the tutor ("+(e&&e.message||"unknown error")+"). Wait a moment and try again.";hist.pop()}
   busy=false}
@@ -170,7 +175,7 @@ function streak(){var t=new Date().toDateString(),s=ld("streak",{d:"",n:0});if(s
 function bar(){$("#pb").style.width=Math.round(pd/P.length*100)+"%"}
 async function ask(msgs,cb){
  if(smp)return await smp(msgs,{cache:false,onText:cb});
- var q=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:hist})});
+ var q=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:hist,level:level})});
  var t=await q.text(),d={};try{d=JSON.parse(t)}catch(e){}
  if(!q.ok||!d.text)throw new Error(d.error||("server answered "+q.status+(q.status==404?", api/chat.js is not deployed":"")));
  return{text:d.text}}
