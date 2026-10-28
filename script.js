@@ -28,7 +28,7 @@ function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math
 var V=[["path","Path","🌱"],["learn","Learn","📖"],["cards","Cards","🃏"],["quiz","Quiz","⭐"],["write","Write","✍️"],["chat","Talk","🎤"]];
 var cur="path";
 function tabs(){$("#tabs").innerHTML=V.map(function(t){return '<button role="tab" data-v="'+t[0]+'" aria-selected="'+(t[0]==cur)+'"><span class="ic">'+t[2]+'</span>'+t[1]+'</button>'}).join("");
- document.querySelectorAll("#tabs button").forEach(function(b){b.onclick=function(){cur=b.dataset.v;tabs();R[cur]()}})}
+ document.querySelectorAll("#tabs button").forEach(function(b){b.onclick=function(){stopVoice();cur=b.dataset.v;tabs();R[cur]()}})}
 function sp(t){return '<button class="sp" aria-label="Listen" data-s="'+t+'">🔊</button>'}
 function bindSay(){document.querySelectorAll("[data-s]").forEach(function(b){b.onclick=function(e){e.stopPropagation();say(b.dataset.s)}})}
 var R={};
@@ -76,7 +76,7 @@ var hist=[],smp=null,busy=false;
 var SYS="You are a patient Chinese (Mandarin) tutor for a complete beginner. This is a spoken conversation, so keep replies to 3 short lines at most. Use only simple words. Always write Chinese characters, then pinyin with tone marks, then the English meaning. Gently correct mistakes. End with one easy question in Chinese (with pinyin and English) to keep the chat going.";
 R.chatText=function(){
  $("#v").innerHTML='<div class="card"><h2>Practice with a tutor</h2><p class="note" id="cn">Say hello in Chinese, or type English and ask how to say something.</p><div id="log"></div><div class="in"><input id="ci" placeholder="Type here, e.g. nǐ hǎo" aria-label="Message"><button class="btn" id="sd">Send</button></div></div>';
- function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;$("#log").appendChild(d);$("#log").scrollTop=1e9;return d}
+ function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;var l=$("#log");if(l){l.appendChild(d);l.scrollTop=1e9}return d}
  hist.forEach(function(m){add(m.role=="user"?"u":"a",m.content)});
  if(!hist.length)add("a","你好！Nǐ hǎo! Hello! 你好吗？Nǐ hǎo ma? How are you?");
  async function go(){var t=$("#ci").value.trim();if(!t||busy)return;
@@ -85,7 +85,7 @@ R.chatText=function(){
   $("#ci").value="";hist.push({role:"user",content:t});add("u",t);busy=true;var d=add("a","…");
   var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+"\n\n"+m.content:m.content}});
   try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text})}
-  catch(e){d.textContent="Couldn’t reach the tutor. Wait a moment and try again. If it keeps failing, check the API key in Vercel.";hist.pop()}
+  catch(e){d.textContent="Couldn’t reach the tutor ("+(e&&e.message||"unknown error")+"). Wait a moment and try again.";hist.pop()}
   busy=false}
  $("#sd").onclick=go;$("#ci").onkeydown=function(e){if(e.key=="Enter")go()}};
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=null,lang="zh-CN",aloud=true,live=false;
@@ -97,16 +97,16 @@ R.chat=function(){
  '<div class="in"><input id="ci" placeholder="Or type here" aria-label="Message"><button class="btn alt" id="sd">Send</button></div></div>';
  $("#lg").value=lang;$("#al").checked=aloud;
  $("#lg").onchange=function(){lang=this.value};$("#al").onchange=function(){aloud=this.checked;if(!aloud)try{speechSynthesis.cancel()}catch(e){}};
- function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;$("#log").appendChild(d);$("#log").scrollTop=1e9;return d}
+ function add(c,t){var d=document.createElement("div");d.className="m "+c;d.textContent=t;var l=$("#log");if(l){l.appendChild(d);l.scrollTop=1e9}return d}
  hist.forEach(function(m){add(m.role=="user"?"u":"a",m.content)});
  if(!hist.length)add("a","你好！Nǐ hǎo! Hello! 你好吗？Nǐ hǎo ma? How are you?");
  async function send(t){t=(t||"").trim();if(!t||busy)return;
   if(!smp){try{smp=await claude.use("sample")}catch(e){smp=null}}
-  
+
   $("#ci").value="";hist.push({role:"user",content:t});add("u",t);busy=true;var d=add("a","…");
   var msgs=hist.map(function(m,i){return{role:m.role,content:i==0?SYS+"\n\n"+m.content:m.content}});
-  try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text});if(aloud)say(zhOnly(r.text))}
-  catch(e){d.textContent="Couldn’t reach the tutor. Wait a moment and try again. If it keeps failing, check the API key in Vercel.";hist.pop()}
+  try{var r=await ask(msgs,function(x){d.textContent=x.text});d.textContent=r.text;hist.push({role:"assistant",content:r.text});if(aloud&&$("#log"))say(zhOnly(r.text))}
+  catch(e){d.textContent="Couldn’t reach the tutor ("+(e&&e.message||"unknown error")+"). Wait a moment and try again.";hist.pop()}
   busy=false}
  $("#sd").onclick=function(){unlock();send($("#ci").value)};$("#ci").onkeydown=function(e){if(e.key=="Enter")send($("#ci").value)};
  $("#mic").onclick=function(){unlock();
@@ -171,5 +171,9 @@ function bar(){$("#pb").style.width=Math.round(pd/P.length*100)+"%"}
 async function ask(msgs,cb){
  if(smp)return await smp(msgs,{cache:false,onText:cb});
  var q=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:hist})});
- var d=await q.json();if(!q.ok||!d.text)throw new Error(d.error||"fail");return{text:d.text}}
+ var t=await q.text(),d={};try{d=JSON.parse(t)}catch(e){}
+ if(!q.ok||!d.text)throw new Error(d.error||("server answered "+q.status+(q.status==404?", api/chat.js is not deployed":"")));
+ return{text:d.text}}
+function stopVoice(){try{if(rec){rec.onend=null;rec.onerror=null;rec.onresult=null;rec.abort()}}catch(e){}live=false;try{speechSynthesis.cancel()}catch(e){}}
+document.addEventListener("visibilitychange",function(){if(document.hidden)stopVoice()});
 tabs();R.path();streak();bar();
